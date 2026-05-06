@@ -20,6 +20,7 @@ class StoredArtifact:
     name: str
     artifact: str
     artifact_hash: str
+    source_hash: str
     is_directory: bool
     created_at_utc: str
 
@@ -45,6 +46,32 @@ def _hash_from_name_or_content(encrypted_path: Path) -> str:
         for chunk in iter(lambda: f.read(65536), b""):
             hasher.update(chunk)
     return hasher.hexdigest()[:24]
+
+
+def _hash_file_content(file_path: Path) -> str:
+    hasher = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def _hash_source(path: Path) -> str:
+    if path.is_file():
+        return _hash_file_content(path)
+
+    if not path.is_dir():
+        raise FileNotFoundError(f"Input path not found: {path}")
+
+    hasher = hashlib.sha256()
+    for file_path in sorted(p for p in path.rglob("*") if p.is_file()):
+        rel = file_path.relative_to(path).as_posix()
+        hasher.update(b"F:")
+        hasher.update(rel.encode("utf-8"))
+        hasher.update(b"\0")
+        hasher.update(_hash_file_content(file_path).encode("ascii"))
+        hasher.update(b"\n")
+    return hasher.hexdigest()
 
 
 class GitStoreUploader:
@@ -83,6 +110,29 @@ class GitStoreUploader:
         self._ensure_repo()
 
         is_directory = source.is_dir()
+        source_hash = _hash_source(source)
+        manifest = self._load_manifest_local()
+        existing_record = manifest.get(name)
+        if existing_record:
+            existing_source_hash = str(existing_record.get("source_hash", "")).lower()
+            if existing_source_hash == source_hash.lower():
+                print(
+                    f"[gitstore] Skip upload: '{name}' already up to date "
+                    f"(source_hash={source_hash[:24]})."
+                )
+                return StoredArtifact(
+                    name=name,
+                    artifact=str(existing_record["artifact"]),
+                    artifact_hash=str(existing_record.get("artifact_hash", "")),
+                    source_hash=existing_source_hash,
+                    is_directory=bool(existing_record["is_directory"]),
+                    created_at_utc=str(existing_record["created_at_utc"]),
+                )
+            if not replace_existing:
+                raise ValueError(
+                    f"Name '{name}' already exists. Use replace_existing=True to replace it."
+                )
+
         level = security_level or self.security_level
         if is_directory:
             encrypted_path = Path(
@@ -109,34 +159,13 @@ class GitStoreUploader:
             artifact_abs = self.repo_path / artifact_rel
             artifact_abs.parent.mkdir(parents=True, exist_ok=True)
 
-            manifest = self._load_manifest_local()
-            existing_record = manifest.get(name)
-            if existing_record:
-                existing_hash = str(existing_record.get("artifact_hash", "")).lower()
-                if existing_hash == artifact_hash:
-                    # Same content already stored for the same logical name.
-                    print(
-                        f"[gitstore] Skip upload: '{name}' already up to date "
-                        f"(hash={artifact_hash})."
-                    )
-                    return StoredArtifact(
-                        name=name,
-                        artifact=str(existing_record["artifact"]),
-                        artifact_hash=existing_hash,
-                        is_directory=bool(existing_record["is_directory"]),
-                        created_at_utc=str(existing_record["created_at_utc"]),
-                    )
-                if not replace_existing:
-                    raise ValueError(
-                        f"Name '{name}' already exists. Use replace_existing=True to replace it."
-                    )
-
             shutil.copy2(encrypted_path, artifact_abs)
 
             record = StoredArtifact(
                 name=name,
                 artifact=artifact_filename,
                 artifact_hash=artifact_hash,
+                source_hash=source_hash,
                 is_directory=is_directory,
                 created_at_utc=datetime.now(timezone.utc).isoformat(),
             )
@@ -144,6 +173,7 @@ class GitStoreUploader:
                 "name": record.name,
                 "artifact": record.artifact,
                 "artifact_hash": record.artifact_hash,
+                "source_hash": record.source_hash,
                 "is_directory": record.is_directory,
                 "created_at_utc": record.created_at_utc,
             }
@@ -191,6 +221,34 @@ class GitStoreUploader:
         )
         git_purge_path_from_history(repo_path=str(self.repo_path), path_in_repo=artifact_rel)
         print(f"[gitstore] Destroyed '{name}' and purged '{artifact_rel}' from history.")
+
+    def destroy_artifact(
+        self,
+        artifact_filename: str,
+        commit_message: str | None = None,
+        purge_history: bool = True,
+    ) -> None:
+        if not artifact_filename or any(sep in artifact_filename for sep in ("/", "\\")):
+            raise ValueError("artifact_filename must be a simple filename without path separators.")
+        self._ensure_repo()
+
+        artifact_rel = f"{self.vault_dir}/{artifact_filename}"
+        artifact_abs = self.repo_path / artifact_rel
+        if not artifact_abs.exists():
+            raise FileNotFoundError(f"Artifact not found: {artifact_abs}")
+
+        artifact_abs.unlink()
+        message = commit_message or f"gitstore: destroy artifact '{artifact_filename}'"
+        git_add_commit_push(
+            repo_path=str(self.repo_path),
+            paths_in_repo=[artifact_rel],
+            commit_message=message,
+        )
+        if purge_history:
+            git_purge_path_from_history(repo_path=str(self.repo_path), path_in_repo=artifact_rel)
+            print(f"[gitstore] Destroyed artifact and purged history: '{artifact_rel}'.")
+        else:
+            print(f"[gitstore] Destroyed artifact without history purge: '{artifact_rel}'.")
 
     def _ensure_repo(self) -> None:
         if not (self.repo_path / ".git").exists():

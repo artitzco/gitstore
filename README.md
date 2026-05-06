@@ -49,13 +49,21 @@ uploader = GitStoreUploader(
 )
 
 record = uploader.store(
-    source_path="C:/data/documento.pdf",   # file or directory
-    name="documento_ventas_q2",            # logical name only
-    replace_existing=True,                   # default: replace and purge previous history
-    commit_message=None,                     # default: automatic message
+    source_path="C:/data/documento.pdf",  # file or directory
+    name="documento_ventas_q2",           # logical name only
+    replace_existing=True,                # default
+    commit_message=None,                  # default: automatic message
 )
 print(record)
 ```
+
+Upload behavior:
+
+- computes `source_hash` from source content before encryption
+- skips upload if same `name` already has same `source_hash`
+- stores artifact as `vault/<name>.asc`
+- stores metadata in `vault/index.json`
+- removes temporary encrypted file after processing
 
 ## Download
 
@@ -68,11 +76,19 @@ downloader = GitStoreDownloader(
 
 output_path = downloader.restore(
     name="documento_ventas_q2",
-    output_path="C:/restore/documento.pdf",
-    overwrite=True,
+    # output_path is optional
+    # overwrite defaults to False
 )
 print(output_path)
 ```
+
+Download behavior:
+
+- downloads artifact from `raw_base_url`
+- restores with `utilitz.crypto` (`overwrite=False` by default)
+- writes local restore registry to `.gitstore.json` at the same level as restored output
+- local registry is a list of metadata entries
+- skips download if same `name` + `artifact_hash` is already restored and output still exists
 
 ## Destroy
 
@@ -84,6 +100,12 @@ uploader.destroy(name="documento_ventas_q2")
 ```
 
 `destroy(...)` removes the current artifact and rewrites Git history for that artifact path.
+
+For legacy/untracked artifacts not present in `index.json`:
+
+```python
+uploader.destroy_artifact("old_file.asc")
+```
 
 ## Password Source
 
