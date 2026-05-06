@@ -10,10 +10,23 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import GitStoreConfig
-from .github_ops import download_raw_file, git_add_commit_push, git_purge_path_from_history
+from .github_ops import (
+    download_raw_file,
+    git_add_commit,
+    git_add_commit_push,
+    git_purge_path_from_history,
+    git_stash_pop,
+    git_stash_push,
+)
 from .crypto_ops import decrypt_directory, decrypt_file, encrypt_directory, encrypt_file
 
 DEFAULT_PASSWORD_ENV_VAR = "GITSTORE_PASSWORD"
+_VALID_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_NAME_RULES_MESSAGE = (
+    "name must be a simple identifier using only letters, numbers, dots, "
+    "underscores, and hyphens. It must start with a letter or number and must "
+    "not contain spaces or path separators."
+)
 
 
 @dataclass(frozen=True)
@@ -36,6 +49,18 @@ def _resolve_password(password: str | None, password_env_var: str) -> str:
     return resolved_password
 
 
+def _validate_name(name: str) -> str:
+    if not isinstance(name, str) or not name:
+        raise ValueError(_NAME_RULES_MESSAGE)
+    if name != name.strip():
+        raise ValueError(_NAME_RULES_MESSAGE)
+    if any(sep in name for sep in ("/", "\\")):
+        raise ValueError(_NAME_RULES_MESSAGE)
+    if not _VALID_NAME_RE.fullmatch(name):
+        raise ValueError(_NAME_RULES_MESSAGE)
+    return name
+
+
 def _hash_from_name_or_content(encrypted_path: Path) -> str:
     # utilitz default output name pattern: -confidential-<24hex>.asc
     m = re.search(r"-confidential-([0-9a-fA-F]{24})", encrypted_path.name)
@@ -47,14 +72,6 @@ def _hash_from_name_or_content(encrypted_path: Path) -> str:
         for chunk in iter(lambda: f.read(65536), b""):
             hasher.update(chunk)
     return hasher.hexdigest()[:24]
-
-
-def _hash_file_content(file_path: Path) -> str:
-    hasher = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        for chunk in iter(lambda: f.read(65536), b""):
-            hasher.update(chunk)
-    return hasher.hexdigest()
 
 
 def _hmac_source(path: Path, secret: str) -> str:
@@ -118,11 +135,10 @@ class GitStoreUploader:
         replace_existing: bool = True,
         security_level: str | None = None,
     ) -> StoredArtifact:
+        name = _validate_name(name)
         source = Path(source_path).expanduser().resolve()
         if not source.exists():
             raise FileNotFoundError(f"Input path not found: {source}")
-        if not name or any(sep in name for sep in ("/", "\\")):
-            raise ValueError("name must be a simple identifier without path separators.")
         self._ensure_repo()
 
         is_directory = source.is_dir()
@@ -212,7 +228,16 @@ class GitStoreUploader:
                 encrypted_path.unlink()
 
     def destroy(self, name: str, commit_message: str | None = None) -> None:
+        name = _validate_name(name)
         self._ensure_repo()
+        stashed = git_stash_push(str(self.repo_path), "gitstore: temporary stash before destroy")
+        try:
+            self._destroy_clean(name=name, commit_message=commit_message)
+        finally:
+            if stashed:
+                git_stash_pop(str(self.repo_path))
+
+    def _destroy_clean(self, name: str, commit_message: str | None = None) -> None:
         manifest = self._load_manifest_local()
         if name not in manifest:
             raise KeyError(f"Name not found in manifest: {name}")
@@ -230,7 +255,7 @@ class GitStoreUploader:
         self._save_manifest_local(manifest)
 
         message = commit_message or f"gitstore: destroy '{name}'"
-        git_add_commit_push(
+        git_add_commit(
             repo_path=str(self.repo_path),
             paths_in_repo=[artifact_rel, self._manifest_rel],
             commit_message=message,
@@ -247,7 +272,23 @@ class GitStoreUploader:
         if not artifact_filename or any(sep in artifact_filename for sep in ("/", "\\")):
             raise ValueError("artifact_filename must be a simple filename without path separators.")
         self._ensure_repo()
+        stashed = git_stash_push(str(self.repo_path), "gitstore: temporary stash before destroy artifact")
+        try:
+            self._destroy_artifact_clean(
+                artifact_filename=artifact_filename,
+                commit_message=commit_message,
+                purge_history=purge_history,
+            )
+        finally:
+            if stashed:
+                git_stash_pop(str(self.repo_path))
 
+    def _destroy_artifact_clean(
+        self,
+        artifact_filename: str,
+        commit_message: str | None = None,
+        purge_history: bool = True,
+    ) -> None:
         artifact_rel = f"{self.vault_dir}/{artifact_filename}"
         artifact_abs = self.repo_path / artifact_rel
         if not artifact_abs.exists():
@@ -255,7 +296,7 @@ class GitStoreUploader:
 
         artifact_abs.unlink()
         message = commit_message or f"gitstore: destroy artifact '{artifact_filename}'"
-        git_add_commit_push(
+        git_add_commit(
             repo_path=str(self.repo_path),
             paths_in_repo=[artifact_rel],
             commit_message=message,
@@ -315,6 +356,7 @@ class GitStoreDownloader:
         output_path: str | None = None,
         overwrite: bool = False,
     ) -> str:
+        name = _validate_name(name)
         record = self._get_manifest_record(name)
         artifact = record["artifact"]
         artifact_hash = str(record.get("artifact_hash") or "")

@@ -65,6 +65,31 @@ Upload behavior:
 - stores metadata in `vault/index.json`
 - removes temporary encrypted file after processing
 
+## Valid Names
+
+`name` is the logical identifier used to upload, restore, and destroy an artifact.
+It is intentionally strict to keep Git paths predictable:
+
+- allowed characters: letters, numbers, dots, underscores, and hyphens
+- must start with a letter or number
+- spaces and path separators are not allowed
+
+Valid examples:
+
+```text
+documento_ventas_q2
+maindb-version-0.1
+backup.2026_05
+```
+
+Invalid examples:
+
+```text
+maindb -version 0.1
+../secret
+folder/documento
+```
+
 ## Download
 
 ```python
