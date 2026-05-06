@@ -21,13 +21,5 @@
     "source_hash": "5c600b79c27ec738c088d1458b810808a318c4820ca43e217e52727948f0a991",
     "is_directory": true,
     "created_at_utc": "2026-05-06T04:47:54.308160+00:00"
-  },
-  "probe_random_test": {
-    "name": "probe_random_test",
-    "artifact": "probe_random_test.asc",
-    "artifact_hash": "be0150b135fc615dde02ad0f",
-    "source_hash": "328a27cd7cdac09d8cef0cbf89f25c94ee2516dd0f55df323a9459df84ee15f0",
-    "is_directory": false,
-    "created_at_utc": "2026-05-06T04:49:48.492322+00:00"
   }
 }
