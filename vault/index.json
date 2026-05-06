@@ -1,1 +1,8 @@
-{}
+{
+  "sample_data_demo": {
+    "artifact": "sample_data_demo__20260506T021050982046Z.asc",
+    "created_at_utc": "2026-05-06T02:10:50.983607+00:00",
+    "is_directory": true,
+    "name": "sample_data_demo"
+  }
+}
