@@ -251,13 +251,21 @@ class GitStoreDownloader:
             name=name,
         )
         local_index = self._load_local_download_index(local_index_path)
-        local_record = local_index.get(name)
-        if (
-            local_record
-            and str(local_record.get("artifact_hash") or "") == artifact_hash
-            and expected_existing
-            and expected_existing.exists()
-        ):
+        already_restored = False
+        for item in local_index:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("name") or "") != name:
+                continue
+            if str(item.get("artifact_hash") or "") != artifact_hash:
+                continue
+            recorded_path = str(item.get("restored_path") or "")
+            recorded_exists = Path(recorded_path).exists() if recorded_path else False
+            expected_exists = expected_existing.exists() if expected_existing else False
+            if expected_exists or recorded_exists:
+                already_restored = True
+                break
+        if already_restored:
             print(
                 f"[gitstore] Skip download: '{name}' already restored "
                 f"(hash={artifact_hash})."
@@ -283,7 +291,7 @@ class GitStoreDownloader:
                     output_path=output_path,
                     overwrite=overwrite,
                 )
-            local_index[name] = {
+            local_index.append({
                 "name": name,
                 "artifact": artifact,
                 "artifact_hash": artifact_hash,
@@ -291,7 +299,7 @@ class GitStoreDownloader:
                 "created_at_utc": str(record.get("created_at_utc", "")),
                 "restored_path": restored_path,
                 "downloaded_at_utc": datetime.now(timezone.utc).isoformat(),
-            }
+            })
             self._save_local_download_index(local_index_path, local_index)
             print(
                 f"[gitstore] Downloaded and restored '{name}' -> '{restored_path}' "
@@ -333,20 +341,21 @@ class GitStoreDownloader:
             base = Path.cwd().resolve()
             target = base / name
 
-        base_dir = target if is_directory else target.parent
-        idx = base_dir / ".gitstore" / "index.json"
+        # Keep metadata file at the same level as the restored artifact.
+        base_dir = target.parent
+        idx = base_dir / ".gitstore.json"
         return idx, target
 
-    def _load_local_download_index(self, index_path: Path) -> dict:
+    def _load_local_download_index(self, index_path: Path) -> list[dict]:
         if not index_path.exists():
-            return {}
+            return []
         with open(index_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        if not isinstance(data, dict):
+        if not isinstance(data, list):
             raise ValueError(f"Invalid local download index format: {index_path}")
-        return data
+        return [item for item in data if isinstance(item, dict)]
 
-    def _save_local_download_index(self, index_path: Path, data: dict) -> None:
+    def _save_local_download_index(self, index_path: Path, data: list[dict]) -> None:
         index_path.parent.mkdir(parents=True, exist_ok=True)
         with open(index_path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(data, f, indent=2, sort_keys=False)
