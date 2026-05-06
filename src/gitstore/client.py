@@ -96,7 +96,7 @@ def _hmac_source(path: Path, secret: str) -> str:
     return mac.hexdigest()
 
 
-def download_from_github(
+def restore_from_github(
     github_url: str,
     password: str | None = None,
     output_path: str | None = None,
@@ -143,6 +143,28 @@ def download_from_github(
         temp_file.unlink(missing_ok=True)
         if temp_dir is not None:
             shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def restore_from_file(
+    encrypted_file_path: str,
+    password: str | None = None,
+    output_path: str | None = None,
+    overwrite: bool = False,
+    password_env_var: str = DEFAULT_PASSWORD_ENV_VAR,
+) -> str:
+    resolved_password = _resolve_password(password, password_env_var)
+    config = GitStoreConfig(password=resolved_password, request_timeout=60)
+    encrypted_file = Path(encrypted_file_path).expanduser().resolve()
+    if not encrypted_file.is_file():
+        raise FileNotFoundError(f"Encrypted file not found: {encrypted_file}")
+    restored_path = decrypt_auto(
+        encrypted_path=str(encrypted_file),
+        config=config,
+        output_path=output_path,
+        overwrite=overwrite,
+    )
+    print(f"[gitstore] Restored local artifact '{encrypted_file}' -> '{restored_path}'.")
+    return restored_path
 
 
 def _load_remote_record_for_artifact(raw_url: str, request_timeout: int) -> dict:

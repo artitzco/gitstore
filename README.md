@@ -35,7 +35,7 @@ gitstore/
 ## Core API
 
 ```python
-from gitstore import upload_to_github, download_from_github
+from gitstore import upload_to_github, restore_from_github, restore_from_file
 ```
 
 ## Upload
@@ -95,9 +95,9 @@ folder/documento
 ## Download
 
 ```python
-from gitstore import download_from_github
+from gitstore import restore_from_github
 
-output_path = download_from_github(
+output_path = restore_from_github(
     github_url="https://github.com/USER/REPO/blob/main/vault/documento_ventas_q2.asc",
     password=None,      # default: uses GITSTORE_PASSWORD
     output_path=None,   # default: restores in the current working directory
@@ -107,6 +107,24 @@ output_path = download_from_github(
 print(output_path)
 ```
 
+Local restore (no network):
+
+```python
+from gitstore import restore_from_file
+
+output_path = restore_from_file(
+    encrypted_file_path="C:/downloads/documento_ventas_q2.asc",
+    password=None,      # default: uses GITSTORE_PASSWORD
+    output_path=None,   # optional
+    overwrite=False,    # default
+)
+print(output_path)
+```
+
+Tip:
+
+- use `restore_from_file(...)` when the target machine has SSL/certificate restrictions and you prefer manual transfer of the `.asc` file.
+
 Download behavior:
 
 - accepts normal GitHub file URLs (`github.com/.../blob/...`) and raw URLs
@@ -115,10 +133,11 @@ Download behavior:
 - downloads the encrypted `.asc` file to a temporary location
 - restores files or directories automatically with `utilitz.crypto`
 - removes the temporary encrypted file after restore
+- supports local decode with `restore_from_file(...)` when manual download is preferred
 
 ## Password Source
 
-`upload_to_github` and `download_from_github` auto-detect password from:
+`upload_to_github`, `restore_from_github`, and `restore_from_file` auto-detect password from:
 
 - `GITSTORE_PASSWORD`
 
