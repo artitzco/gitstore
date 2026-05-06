@@ -2,10 +2,10 @@
   "maindb -version 0.1": {
     "name": "maindb -version 0.1",
     "artifact": "maindb -version 0.1.asc",
-    "artifact_hash": "ad8b78b690d8891cd21bf695",
-    "source_hash": "a79b2a3dafc7c4ab5601b3f42c1d9fca480d8f2a5b8911084d2e691c457d2fb8",
+    "artifact_hash": "7cd4f345df1bd42a424fb00c",
+    "source_hash": "5c600b79c27ec738c088d1458b810808a318c4820ca43e217e52727948f0a991",
     "is_directory": true,
-    "created_at_utc": "2026-05-06T03:38:03.514261+00:00"
+    "created_at_utc": "2026-05-06T04:09:18.559617+00:00"
   },
   "sample_data_demo": {
     "name": "sample_data_demo",
