@@ -3,6 +3,7 @@ import os
 import shutil
 import tempfile
 import hashlib
+import hmac
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -56,22 +57,37 @@ def _hash_file_content(file_path: Path) -> str:
     return hasher.hexdigest()
 
 
-def _hash_source(path: Path) -> str:
+def _hmac_source(path: Path, secret: str) -> str:
+    key = hashlib.sha256(secret.encode("utf-8")).digest()
+
     if path.is_file():
-        return _hash_file_content(path)
+        mac = hmac.new(key, digestmod=hashlib.sha256)
+        mac.update(b"F:")
+        mac.update(path.name.encode("utf-8"))
+        mac.update(b"\0")
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                mac.update(chunk)
+        return mac.hexdigest()
 
     if not path.is_dir():
         raise FileNotFoundError(f"Input path not found: {path}")
 
-    hasher = hashlib.sha256()
+    mac = hmac.new(key, digestmod=hashlib.sha256)
     for file_path in sorted(p for p in path.rglob("*") if p.is_file()):
         rel = file_path.relative_to(path).as_posix()
-        hasher.update(b"F:")
-        hasher.update(rel.encode("utf-8"))
-        hasher.update(b"\0")
-        hasher.update(_hash_file_content(file_path).encode("ascii"))
-        hasher.update(b"\n")
-    return hasher.hexdigest()
+        mac.update(b"F:")
+        mac.update(rel.encode("utf-8"))
+        mac.update(b"\0")
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                mac.update(chunk)
+        mac.update(b"\n")
+    return mac.hexdigest()
+
+
+def _hash_key_id(secret: str) -> str:
+    return hashlib.sha256(f"gitstore-hash-key:{secret}".encode("utf-8")).hexdigest()[:24]
 
 
 class GitStoreUploader:
@@ -110,7 +126,7 @@ class GitStoreUploader:
         self._ensure_repo()
 
         is_directory = source.is_dir()
-        source_hash = _hash_source(source)
+        source_hash = _hmac_source(source, self.config.password)
         manifest = self._load_manifest_local()
         existing_record = manifest.get(name)
         if existing_record:
@@ -303,6 +319,7 @@ class GitStoreDownloader:
         artifact = record["artifact"]
         artifact_hash = str(record.get("artifact_hash") or "")
         is_directory = bool(record["is_directory"])
+        current_key_id = _hash_key_id(self.config.password)
         local_index_path, expected_existing = self._local_registry_paths(
             output_path=output_path,
             is_directory=is_directory,
@@ -316,6 +333,9 @@ class GitStoreDownloader:
             if str(item.get("name") or "") != name:
                 continue
             if str(item.get("artifact_hash") or "") != artifact_hash:
+                continue
+            if str(item.get("hash_key_id") or "") != current_key_id:
+                # Password changed: force restore again.
                 continue
             recorded_path = str(item.get("restored_path") or "")
             recorded_exists = Path(recorded_path).exists() if recorded_path else False
@@ -353,6 +373,7 @@ class GitStoreDownloader:
                 "name": name,
                 "artifact": artifact,
                 "artifact_hash": artifact_hash,
+                "hash_key_id": current_key_id,
                 "is_directory": is_directory,
                 "created_at_utc": str(record.get("created_at_utc", "")),
                 "restored_path": restored_path,
