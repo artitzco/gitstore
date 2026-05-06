@@ -44,7 +44,7 @@ from gitstore import GitStoreUploader, GitStoreDownloader
 from gitstore import GitStoreUploader
 
 uploader = GitStoreUploader(
-    repo_path="C:/repos/my-publish-repo",  # optional, defaults to current working directory
+    repo_path="C:/repos/my-publish-repo",  # required
     security_level="high",                 # default
 )
 
