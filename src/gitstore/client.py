@@ -115,6 +115,10 @@ class GitStoreUploader:
                 existing_hash = str(existing_record.get("artifact_hash", "")).lower()
                 if existing_hash == artifact_hash:
                     # Same content already stored for the same logical name.
+                    print(
+                        f"[gitstore] Skip upload: '{name}' already up to date "
+                        f"(hash={artifact_hash})."
+                    )
                     return StoredArtifact(
                         name=name,
                         artifact=str(existing_record["artifact"]),
@@ -152,6 +156,10 @@ class GitStoreUploader:
                 paths_in_repo=paths_to_commit,
                 commit_message=message,
             )
+            print(
+                f"[gitstore] Uploaded '{name}' -> '{artifact_rel}' "
+                f"(hash={artifact_hash})."
+            )
             return record
         finally:
             if encrypted_path.exists():
@@ -182,6 +190,7 @@ class GitStoreUploader:
             commit_message=message,
         )
         git_purge_path_from_history(repo_path=str(self.repo_path), path_in_repo=artifact_rel)
+        print(f"[gitstore] Destroyed '{name}' and purged '{artifact_rel}' from history.")
 
     def _ensure_repo(self) -> None:
         if not (self.repo_path / ".git").exists():
@@ -249,6 +258,10 @@ class GitStoreDownloader:
             and expected_existing
             and expected_existing.exists()
         ):
+            print(
+                f"[gitstore] Skip download: '{name}' already restored "
+                f"(hash={artifact_hash})."
+            )
             return str(expected_existing)
 
         temp_dir = Path(tempfile.mkdtemp(prefix="gitstore_restore_"))
@@ -280,6 +293,10 @@ class GitStoreDownloader:
                 "downloaded_at_utc": datetime.now(timezone.utc).isoformat(),
             }
             self._save_local_download_index(local_index_path, local_index)
+            print(
+                f"[gitstore] Downloaded and restored '{name}' -> '{restored_path}' "
+                f"(hash={artifact_hash})."
+            )
             return restored_path
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
