@@ -19,7 +19,7 @@ def main() -> None:
     output_folder = project_root / "examples" / "data" / "restored_sample_data"
 
     restored_path = restore_from_github(
-        github_url="https://github.com/artitzco/gitstore/blob/main/vault/sample_data_demo.asc",
+        github_raw_url="https://raw.githubusercontent.com/artitzco/gitstore/main/vault/sample_data_demo.asc",
         password=None,
         output_path=str(output_folder),
         overwrite=False,

@@ -98,7 +98,7 @@ folder/documento
 from gitstore import restore_from_github
 
 output_path = restore_from_github(
-    github_url="https://github.com/USER/REPO/blob/main/vault/documento_ventas_q2.asc",
+    github_raw_url="https://raw.githubusercontent.com/USER/REPO/main/vault/documento_ventas_q2.asc",
     password=None,      # default: uses GITSTORE_PASSWORD
     output_path=None,   # default: restores in the current working directory
     overwrite=False,    # default
@@ -127,7 +127,8 @@ Tip:
 
 Download behavior:
 
-- accepts normal GitHub file URLs (`github.com/.../blob/...`) and raw URLs
+- expects RAW GitHub URLs (`raw.githubusercontent.com/...`) as primary input
+- also accepts `github.com/.../blob/...` and normalizes automatically
 - skips download when `output_path` already exists and matches the remote `source_hash` in `vault/index.json`
 - set `force_download=True` to download even when the local output appears aligned
 - downloads the encrypted `.asc` file to a temporary location

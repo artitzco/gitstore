@@ -97,7 +97,7 @@ def _hmac_source(path: Path, secret: str) -> str:
 
 
 def restore_from_github(
-    github_url: str,
+    github_raw_url: str,
     password: str | None = None,
     output_path: str | None = None,
     overwrite: bool = False,
@@ -107,7 +107,7 @@ def restore_from_github(
 ) -> str:
     resolved_password = _resolve_password(password, password_env_var)
     config = GitStoreConfig(password=resolved_password, request_timeout=request_timeout)
-    raw_url = normalize_github_file_url(github_url)
+    raw_url = normalize_github_file_url(github_raw_url)
     if output_path is not None and not overwrite and not force_download:
         existing_output = Path(output_path).expanduser().resolve()
         if existing_output.exists():
