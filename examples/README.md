@@ -4,9 +4,8 @@ This folder is a self-contained demo for `gitstore`.
 
 ## Included scripts
 
-- `upload_example.py`: encrypts and uploads `examples/data/sample_data`.
-- `restore_example.py`: restores `sample_data_demo` using default restore behavior (`output_path=None`, `overwrite=False`).
-- `destroy_example.py`: destroys `sample_data_demo` (including history purge).
+- `upload_example.py`: encrypts and uploads `examples/data/sample_data` with `upload_to_github`.
+- `restore_example.py`: downloads and restores an encrypted GitHub file with `download_from_github`.
 
 ## Sample data
 

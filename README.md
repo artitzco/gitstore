@@ -3,7 +3,7 @@
 `gitstore` is a focused Python package for one goal:
 
 - upload encrypted files/folders to a GitHub-backed repo
-- restore them later by logical name from GitHub raw URLs
+- download and restore encrypted GitHub files later
 
 ## Installation
 
@@ -35,23 +35,24 @@ gitstore/
 ## Core API
 
 ```python
-from gitstore import GitStoreUploader, GitStoreDownloader
+from gitstore import upload_to_github, download_from_github
 ```
 
 ## Upload
 
 ```python
-from gitstore import GitStoreUploader
+from gitstore import upload_to_github
 
-uploader = GitStoreUploader(
-    repo_path="C:/repos/my-publish-repo",  # required
-    security_level="high",                 # default
-)
-
-record = uploader.store(
+record = upload_to_github(
     source_path="C:/data/documento.pdf",  # file or directory
     name="documento_ventas_q2",           # logical name only
+    repo_path="C:/repos/my-publish-repo", # required
+    password=None,                        # default: uses GITSTORE_PASSWORD
+    vault_dir="vault",                    # default
+    request_timeout=60,                   # default
+    security_level="high",                # default
     replace_existing=True,                # default
+    force_upload=False,                   # default
     commit_message=None,                  # default: automatic message
 )
 print(record)
@@ -61,13 +62,14 @@ Upload behavior:
 
 - computes `source_hash` from source content before encryption
 - skips upload if same `name` already has same `source_hash`
+- set `force_upload=True` to upload even when the current source matches the remote metadata
 - stores artifact as `vault/<name>.asc`
 - stores metadata in `vault/index.json`
 - removes temporary encrypted file after processing
 
 ## Valid Names
 
-`name` is the logical identifier used to upload, restore, and destroy an artifact.
+`name` is the logical identifier used to upload an artifact.
 It is intentionally strict to keep Git paths predictable:
 
 - allowed characters: letters, numbers, dots, underscores, and hyphens
@@ -93,48 +95,30 @@ folder/documento
 ## Download
 
 ```python
-from gitstore import GitStoreDownloader
+from gitstore import download_from_github
 
-downloader = GitStoreDownloader(
-    raw_base_url="https://raw.githubusercontent.com/USER/REPO/main",
-)
-
-output_path = downloader.restore(
-    name="documento_ventas_q2",
-    # output_path is optional
-    # overwrite defaults to False
+output_path = download_from_github(
+    github_url="https://github.com/USER/REPO/blob/main/vault/documento_ventas_q2.asc",
+    password=None,      # default: uses GITSTORE_PASSWORD
+    output_path=None,   # default: restores in the current working directory
+    overwrite=False,    # default
+    force_download=False, # default
 )
 print(output_path)
 ```
 
 Download behavior:
 
-- downloads artifact from `raw_base_url`
-- restores with `utilitz.crypto` (`overwrite=False` by default)
-- writes local restore registry to `.gitstore.json` at the same level as restored output
-- local registry is a list of metadata entries
-- skips download if same `name` + `artifact_hash` is already restored and output still exists
-
-## Destroy
-
-```python
-from gitstore import GitStoreUploader
-
-uploader = GitStoreUploader(repo_path="C:/repos/my-publish-repo")
-uploader.destroy(name="documento_ventas_q2")
-```
-
-`destroy(...)` removes the current artifact and rewrites Git history for that artifact path.
-
-For legacy/untracked artifacts not present in `index.json`:
-
-```python
-uploader.destroy_artifact("old_file.asc")
-```
+- accepts normal GitHub file URLs (`github.com/.../blob/...`) and raw URLs
+- skips download when `output_path` already exists and matches the remote `source_hash` in `vault/index.json`
+- set `force_download=True` to download even when the local output appears aligned
+- downloads the encrypted `.asc` file to a temporary location
+- restores files or directories automatically with `utilitz.crypto`
+- removes the temporary encrypted file after restore
 
 ## Password Source
 
-Both classes auto-detect password from:
+`upload_to_github` and `download_from_github` auto-detect password from:
 
 - `GITSTORE_PASSWORD`
 

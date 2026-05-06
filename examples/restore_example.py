@@ -1,32 +1,31 @@
-from gitstore import GitStoreDownloader
+from pathlib import Path
+
+from gitstore import download_from_github
 
 
 def main() -> None:
     """
     Restore example with explicit defaults.
 
-    GitStoreDownloader defaults:
+    download_from_github defaults:
     - password=None (uses GITSTORE_PASSWORD)
-    - vault_dir="vault"
-    - request_timeout=60
-    - password_env_var="GITSTORE_PASSWORD"
-
-    restore defaults:
     - output_path=None
     - overwrite=False
+    - force_download=False
+    - request_timeout=60
+    - password_env_var="GITSTORE_PASSWORD"
     """
-    downloader = GitStoreDownloader(
-        raw_base_url="https://raw.githubusercontent.com/artitzco/gitstore/main",
+    project_root = Path(__file__).resolve().parents[1]
+    output_folder = project_root / "examples" / "data" / "restored_sample_data"
+
+    restored_path = download_from_github(
+        github_url="https://github.com/artitzco/gitstore/blob/main/vault/sample_data_demo.asc",
         password=None,
-        vault_dir="vault",
+        output_path=str(output_folder),
+        overwrite=False,
+        force_download=False,
         request_timeout=60,
         password_env_var="GITSTORE_PASSWORD",
-    )
-
-    restored_path = downloader.restore(
-        name="sample_data_demo",
-        output_path=None,
-        overwrite=False,
     )
     print(restored_path)
 

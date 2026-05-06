@@ -91,3 +91,27 @@ def decrypt_directory(
         output_path=output_path,
         overwrite=overwrite,
     )
+
+
+def decrypt_auto(
+    encrypted_path: str,
+    config: GitStoreConfig,
+    output_path: str | None = None,
+    overwrite: bool = False,
+) -> str:
+    try:
+        return decrypt_file(
+            encrypted_path=encrypted_path,
+            config=config,
+            output_path=output_path,
+            overwrite=overwrite,
+        )
+    except ValueError as exc:
+        if "directory archive" not in str(exc):
+            raise
+    return decrypt_directory(
+        encrypted_path=encrypted_path,
+        config=config,
+        output_path=output_path,
+        overwrite=overwrite,
+    )
