@@ -1,9 +1,10 @@
 {
   "maindb -version 0.1": {
-    "artifact": "maindb -version 0.1__20260506T024710523096Z.asc",
-    "created_at_utc": "2026-05-06T02:47:10.529644+00:00",
+    "name": "maindb -version 0.1",
+    "artifact": "maindb -version 0.1.asc",
+    "artifact_hash": "10dad413ee2ce8898be3d0ba",
     "is_directory": true,
-    "name": "maindb -version 0.1"
+    "created_at_utc": "2026-05-06T03:30:32.931633+00:00"
   },
   "sample_data_demo": {
     "name": "sample_data_demo",
