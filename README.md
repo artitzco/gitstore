@@ -8,7 +8,7 @@
 ## Installation
 
 ```bash
-pip install -e .
+pip install gitstore
 ```
 
 ## Dependency on `utilitz`
