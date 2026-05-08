@@ -10,9 +10,9 @@
   "maindb_version_0.1": {
     "name": "maindb_version_0.1",
     "artifact": "maindb_version_0.1.asc",
-    "artifact_hash": "7aefc14760059024ad350c59",
-    "source_hash": "1f0f297d38a304f2a1c822a717fa1e32604b2f83122edb6e2b649666c15331d1",
+    "artifact_hash": "49095bddfe7c4aac99a170a9",
+    "source_hash": "f0d84f1a0421460955994bcfad34f0ab5638cd28ea4e43704994e96a63cc8cfd",
     "is_directory": true,
-    "created_at_utc": "2026-05-08T02:54:25.579053+00:00"
+    "created_at_utc": "2026-05-08T03:33:18.281558+00:00"
   }
 }
