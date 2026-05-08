@@ -1,4 +1,5 @@
 import subprocess
+import urllib.request
 from pathlib import Path
 
 import requests
@@ -37,6 +38,16 @@ def download_raw_file(raw_url: str, output_path: str, timeout: int = 60) -> str:
             for chunk in response.iter_content(chunk_size=65536):
                 if chunk:
                     f.write(chunk)
+    return str(destination)
+
+
+def download_raw_file_urllib(raw_url: str, output_path: str, timeout: int = 60) -> str:
+    destination = Path(output_path).expanduser().resolve()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with urllib.request.urlopen(raw_url, timeout=timeout) as response:
+        content = response.read()
+    with open(destination, "wb") as f:
+        f.write(content)
     return str(destination)
 
 

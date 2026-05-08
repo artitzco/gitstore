@@ -10,7 +10,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import GitStoreConfig
-from .github_ops import download_raw_file, git_add_commit_push, normalize_github_file_url
+from .github_ops import (
+    download_raw_file,
+    download_raw_file_urllib,
+    git_add_commit_push,
+    normalize_github_file_url,
+)
 from .crypto_ops import decrypt_auto, encrypt_directory, encrypt_file
 
 DEFAULT_PASSWORD_ENV_VAR = "GITSTORE_PASSWORD"
@@ -101,14 +106,15 @@ def restore_from_github(
     password: str | None = None,
     output_path: str | None = None,
     overwrite: bool = False,
-    force_download: bool = False,
+    force: bool = False,
+    use_urllib: bool = False,
     request_timeout: int = 60,
     password_env_var: str = DEFAULT_PASSWORD_ENV_VAR,
 ) -> str:
     resolved_password = _resolve_password(password, password_env_var)
     config = GitStoreConfig(password=resolved_password, request_timeout=request_timeout)
     raw_url = normalize_github_file_url(github_raw_url)
-    if output_path is not None and not overwrite and not force_download:
+    if output_path is not None and not overwrite and not force:
         existing_output = Path(output_path).expanduser().resolve()
         if existing_output.exists():
             remote_record = _load_remote_record_for_artifact(raw_url, request_timeout)
@@ -117,20 +123,14 @@ def restore_from_github(
                 print(f"[gitstore] Skip download: '{raw_url}' already restored at '{existing_output}'.")
                 return str(existing_output)
 
-    temp_dir = None
-    if output_path is None:
-        fd, temp_name = tempfile.mkstemp(
-            prefix=".gitstore_download_",
-            suffix=".asc",
-            dir=Path.cwd(),
-        )
-        os.close(fd)
-        temp_file = Path(temp_name)
-    else:
-        temp_dir = Path(tempfile.mkdtemp(prefix="gitstore_download_"))
-        temp_file = temp_dir / "artifact.asc"
+    temp_dir = Path(tempfile.mkdtemp(prefix="gitstore_restore_"))
+    temp_file = temp_dir / "artifact.asc"
+    cleanup_temp_dir = output_path is not None
     try:
-        download_raw_file(raw_url, str(temp_file), timeout=request_timeout)
+        if use_urllib:
+            download_raw_file_urllib(raw_url, str(temp_file), timeout=request_timeout)
+        else:
+            download_raw_file(raw_url, str(temp_file), timeout=request_timeout)
         restored_path = decrypt_auto(
             encrypted_path=str(temp_file),
             config=config,
@@ -141,7 +141,7 @@ def restore_from_github(
         return restored_path
     finally:
         temp_file.unlink(missing_ok=True)
-        if temp_dir is not None:
+        if cleanup_temp_dir:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
 
@@ -201,7 +201,7 @@ def upload_to_github(
     security_level: str = "high",
     commit_message: str | None = None,
     replace_existing: bool = True,
-    force_upload: bool = False,
+    force: bool = False,
 ) -> StoredArtifact:
     if not repo_path:
         raise ValueError("repo_path is required.")
@@ -227,7 +227,7 @@ def upload_to_github(
     existing_record = manifest.get(name)
     if existing_record:
         existing_source_hash = str(existing_record.get("source_hash", "")).lower()
-        if existing_source_hash == source_hash.lower() and not force_upload:
+        if existing_source_hash == source_hash.lower() and not force:
             print(
                 f"[gitstore] Skip upload: '{name}' already up to date "
                 f"(source_hash={source_hash[:24]})."

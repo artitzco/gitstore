@@ -15,7 +15,7 @@ def main() -> None:
     - security_level="high"
     - commit_message=None (auto message)
     - replace_existing=True
-    - force_upload=False
+    - force=False
     """
     project_root = Path(__file__).resolve().parents[1]
     sample_folder = project_root / "examples" / "data" / "sample_data"
@@ -31,7 +31,7 @@ def main() -> None:
         security_level="high",
         commit_message=None,
         replace_existing=True,
-        force_upload=False,
+        force=False,
     )
     print(record)
 

@@ -11,7 +11,8 @@ def main() -> None:
     - password=None (uses GITSTORE_PASSWORD)
     - output_path=None
     - overwrite=False
-    - force_download=False
+    - force=False
+    - use_urllib=False
     - request_timeout=60
     - password_env_var="GITSTORE_PASSWORD"
     """
@@ -23,7 +24,8 @@ def main() -> None:
         password=None,
         output_path=str(output_folder),
         overwrite=False,
-        force_download=False,
+        force=False,
+        use_urllib=False,
         request_timeout=60,
         password_env_var="GITSTORE_PASSWORD",
     )

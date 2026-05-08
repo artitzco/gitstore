@@ -52,7 +52,7 @@ record = upload_to_github(
     request_timeout=60,                   # default
     security_level="high",                # default
     replace_existing=True,                # default
-    force_upload=False,                   # default
+    force=False,                          # default
     commit_message=None,                  # default: automatic message
 )
 print(record)
@@ -62,7 +62,7 @@ Upload behavior:
 
 - computes `source_hash` from source content before encryption
 - skips upload if same `name` already has same `source_hash`
-- set `force_upload=True` to upload even when the current source matches the remote metadata
+- set `force=True` to upload even when the current source matches the remote metadata
 - stores artifact as `vault/<name>.asc`
 - stores metadata in `vault/index.json`
 - removes temporary encrypted file after processing
@@ -100,9 +100,10 @@ from gitstore import restore_from_github
 output_path = restore_from_github(
     github_raw_url="https://raw.githubusercontent.com/USER/REPO/main/vault/documento_ventas_q2.asc",
     password=None,      # default: uses GITSTORE_PASSWORD
-    output_path=None,   # default: restores in the current working directory
+    output_path=None,   # default: restores in a system temp folder (outside the repo)
     overwrite=False,    # default
-    force_download=False, # default
+    force=False,        # default
+    use_urllib=False,   # default: True uses urllib alternative route
 )
 print(output_path)
 ```
@@ -130,8 +131,10 @@ Download behavior:
 - expects RAW GitHub URLs (`raw.githubusercontent.com/...`) as primary input
 - also accepts `github.com/.../blob/...` and normalizes automatically
 - skips download when `output_path` already exists and matches the remote `source_hash` in `vault/index.json`
-- set `force_download=True` to download even when the local output appears aligned
+- set `force=True` to download even when the local output appears aligned
+- set `use_urllib=True` to use the urllib alternative transport path
 - downloads the encrypted `.asc` file to a temporary location
+- when `output_path=None`, restore output is created in a system temp folder (not in project root)
 - restores files or directories automatically with `utilitz.crypto`
 - removes the temporary encrypted file after restore
 - supports local decode with `restore_from_file(...)` when manual download is preferred
