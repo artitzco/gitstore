@@ -14,6 +14,7 @@ from .github_ops import (
     download_text_urllib,
     git_add_commit_push,
     normalize_github_file_url,
+    resolve_push_remote,
     write_text_file,
 )
 from .state import find_download, find_upload, load_state, save_state, upsert_download, upsert_upload
@@ -135,8 +136,9 @@ def upload_to_github(
     include_patterns: str | list[str] | tuple[str, ...] | None = None,
     exclude_patterns: str | list[str] | tuple[str, ...] | None = None,
     gitstore_path: PathInput | None = None,
+    push_remote_name: str | None = None,
     salt_size: int = 16,
-    iterations: int = 100_000,
+    iterations: int = 600_000,
     key_length: int = 32,
     hash_name: str = "sha256",
 ) -> StoredArtifact:
@@ -220,10 +222,15 @@ def upload_to_github(
     _save_manifest_local(manifest_path, manifest)
 
     message = commit_message or f"gitstore: store '{artifact_name}'"
+    remote_name = resolve_push_remote(
+        resolved_repo_path,
+        push_remote_name=push_remote_name,
+    )
     git_add_commit_push(
         repo_dir=resolved_repo_path,
         paths_in_repo=[artifact_rel, manifest_rel],
         commit_message=message,
+        push_remote_name=remote_name,
     )
     state_record = {
         "repo_dir": resolved_repo_dir,

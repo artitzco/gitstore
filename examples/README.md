@@ -1,6 +1,6 @@
 # Examples
 
-This folder keeps only the v1.0.0 directory workflow.
+This folder keeps only the v1.0.1 directory workflow.
 
 ## Included scripts
 

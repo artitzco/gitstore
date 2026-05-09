@@ -67,10 +67,53 @@ def write_text_file(path: PathInput, content: str, encoding: str = "utf-8") -> s
     return str(destination)
 
 
+def _git_config_get(repo: Path, args: list[str]) -> list[str]:
+    result = subprocess.run(
+        ["git", "config", "--get-regexp", *args],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode not in (0, 1):
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            result.args,
+            output=result.stdout,
+            stderr=result.stderr,
+        )
+    lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    return lines
+
+
+def resolve_push_remote(repo_dir: PathInput, push_remote_name: str | None = None) -> str:
+    repo = Path(repo_dir).expanduser().resolve()
+    if push_remote_name:
+        return push_remote_name
+
+    remote_lines = _git_config_get(repo, [r"^remote\..*\.url$"])
+    candidates: list[tuple[str, str]] = []
+    for line in remote_lines:
+        key, url = line.split(" ", 1)
+        remote_name = key.split(".")[1]
+        candidates.append((remote_name, url))
+
+    for remote_name, url in candidates:
+        lowered = url.strip().lower()
+        if lowered.startswith("http://") or lowered.startswith("https://") or lowered.startswith("git@"):
+            return remote_name
+
+    if candidates:
+        return candidates[0][0]
+
+    raise ValueError(f"No git remotes are configured for repository: {repo}")
+
+
 def git_add_commit_push(
     repo_dir: PathInput,
     paths_in_repo: list[str],
     commit_message: str,
+    push_remote_name: str | None = None,
 ) -> None:
     repo = Path(repo_dir).expanduser().resolve()
     if not (repo / ".git").exists():
@@ -78,6 +121,7 @@ def git_add_commit_push(
     if not paths_in_repo:
         raise ValueError("paths_in_repo must not be empty.")
 
+    remote_name = resolve_push_remote(repo, push_remote_name=push_remote_name)
     _run_git(repo, ["add", *paths_in_repo])
     _run_git(repo, ["commit", "-m", commit_message])
-    _run_git(repo, ["push"])
+    _run_git(repo, ["push", remote_name, "HEAD"])

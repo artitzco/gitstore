@@ -38,8 +38,9 @@ record = upload_to_github(
     include_patterns=None,
     exclude_patterns=None,
     gitstore_path=None,
+    push_remote_name=None,
     salt_size=16,
-    iterations=100_000,
+    iterations=600_000,
     key_length=32,
     hash_name="sha256",
 )
@@ -47,6 +48,8 @@ print(record)
 ```
 
 Path parameters such as `local_dir`, `repo_dir`, and `gitstore_path` accept either strings or `pathlib.Path` objects.
+`push_remote_name` lets you force the git remote used for the upload push, for example `"github"`.
+This is useful when `origin` is not the cloud remote you actually want to update.
 
 Upload behavior:
 
@@ -67,7 +70,7 @@ Encryption settings are exposed as named `upload_to_github(...)` parameters and 
 Supported parameters in `utilitz[crypto]` 0.9.1:
 
 - `salt_size`: default `16`
-- `iterations`: default `100_000`
+- `iterations`: default `600_000`
 - `key_length`: default `32`
 - `hash_name`: only `"sha256"` is supported
 

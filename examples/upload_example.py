@@ -21,8 +21,9 @@ def main() -> None:
     - include_patterns=None
     - exclude_patterns=None
     - gitstore_path=None: uses ~/.gitstore.json
+    - push_remote_name=None
     - salt_size=16
-    - iterations=100_000
+    - iterations=600_000
     - key_length=32
     - hash_name="sha256"
     """
@@ -43,8 +44,9 @@ def main() -> None:
         include_patterns=None,
         exclude_patterns=None,
         gitstore_path=None,
+        push_remote_name=None,
         salt_size=16,
-        iterations=100_000,
+        iterations=600_000,
         key_length=32,
         hash_name="sha256",
     )
