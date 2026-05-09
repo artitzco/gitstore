@@ -3,5 +3,10 @@
     "artifact_name": "sample_data_demo",
     "artifact_hash": "15bb7b7e9657e9366de67e4994b6f464803a893df0ded7263c2d7197d47d8d75",
     "timestamp": "2026-05-09T06:24:53.413013Z"
+  },
+  {
+    "artifact_name": "maindb_source",
+    "artifact_hash": "1e3244206f110192121abdab85be65591b6a2f9344a8914dd07fc6f3f5f887c0",
+    "timestamp": "2026-05-09T18:00:57.592465Z"
   }
 ]
