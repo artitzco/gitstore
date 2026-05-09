@@ -1,9 +1,6 @@
 # gitstore
 
-`gitstore` is a focused Python package for one goal:
-
-- upload encrypted files/folders to a GitHub-backed repo
-- download and restore encrypted GitHub files later
+`gitstore` encrypts directories with `utilitz.crypto` and exchanges the encrypted text artifacts through GitHub-backed repositories.
 
 ## Installation
 
@@ -15,22 +12,7 @@ pip install gitstore
 
 This project depends on:
 
-- `utilitz[crypto]`
-- `requests`
-
-## Project Structure
-
-```text
-gitstore/
-  src/gitstore/
-    __init__.py
-    client.py
-    config.py
-    crypto_ops.py
-    github_ops.py
-  pyproject.toml
-  README.md
-```
+- `utilitz[crypto]` 0.9.1 or newer
 
 ## Core API
 
@@ -38,39 +20,106 @@ gitstore/
 from gitstore import upload_to_github, restore_from_github, restore_from_file
 ```
 
-## Upload
+## Upload a Directory
 
 ```python
 from gitstore import upload_to_github
 
 record = upload_to_github(
-    source_path="C:/data/documento.pdf",  # file or directory
-    name="documento_ventas_q2",           # logical name only
-    repo_path="C:/repos/my-publish-repo", # required
-    password=None,                        # default: uses GITSTORE_PASSWORD
-    vault_dir="vault",                    # default
-    request_timeout=60,                   # default
-    security_level="high",                # default
-    replace_existing=True,                # default
-    force=False,                          # default
-    commit_message=None,                  # default: automatic message
+    local_dir="C:/data/my_directory",
+    name="my_backup_2026_05",
+    repo_dir="C:/repos/my-vault-repo",
+    password=None,
+    vault_subdir="vault",
+    request_timeout=60,
+    commit_message=None,
+    replace_existing=True,
+    force=False,
+    include_patterns=None,
+    exclude_patterns=None,
+    gitstore_path=None,
+    salt_size=16,
+    iterations=100_000,
+    key_length=32,
+    hash_name="sha256",
 )
 print(record)
 ```
 
+Path parameters such as `local_dir`, `repo_dir`, and `gitstore_path` accept either strings or `pathlib.Path` objects.
+
 Upload behavior:
 
-- computes `source_hash` from source content before encryption
-- skips upload if same `name` already has same `source_hash`
-- set `force=True` to upload even when the current source matches the remote metadata
-- stores artifact as `vault/<name>.asc`
-- stores metadata in `vault/index.json`
-- removes temporary encrypted file after processing
+- builds a `utilitz.crypto.CryptoInput` from the source directory
+- compares the input `content_hash` with local state in `~/.gitstore.json`
+- skips encryption and upload when the local content is unchanged, unless `force=True`
+- encrypts with the security parameters passed through to `utilitz.crypto.Encryptor.encrypt(...)`
+- writes the encrypted UTF-8 text manually as `vault/<name>.asc`
+- stores only `artifact_name`, `artifact_hash`, and `timestamp` in `vault/index.json`
+- keeps the private `content_hash` only in local state
+- runs `git add`, `git commit`, and `git push` only for the `.asc` artifact and `index.json`
+
+## Encryption Parameters
+
+`gitstore` does not keep legacy security levels such as `standard`, `high`, or `paranoid`.
+Encryption settings are exposed as named `upload_to_github(...)` parameters and passed directly to `utilitz.crypto.Encryptor.encrypt(...)`.
+
+Supported parameters in `utilitz[crypto]` 0.9.1:
+
+- `salt_size`: default `16`
+- `iterations`: default `100_000`
+- `key_length`: default `32`
+- `hash_name`: only `"sha256"` is supported
+
+The defaults match `utilitz[crypto]` 0.9.1.
+
+## Restore a Directory
+
+```python
+from gitstore import restore_from_github
+
+restored_path = restore_from_github(
+    github_raw_url="https://raw.githubusercontent.com/USER/REPO/main/vault/my_backup_2026_05.asc",
+    password=None,
+    local_dir="C:/restore/my_backup_2026_05",
+    overwrite=False,
+    force=False,
+    request_timeout=60,
+    gitstore_path=None,
+)
+print(restored_path)
+```
+
+`local_dir` accepts either a string or a `pathlib.Path` object.
+
+Restore behavior:
+
+- accepts raw GitHub URLs and normalizes `github.com/.../blob/...` URLs to raw URLs
+- downloads text artifacts with `urllib`
+- compares the remote `artifact_hash` from `index.json` with local download state
+- skips the download when the destination exists and the artifact hash is unchanged, unless `force=True`
+- downloads the remote artifact when the hash changed, then delegates existing-destination handling to `utilitz`
+- uses `force=True` only to bypass the skip check; `overwrite` still controls whether the destination may be replaced
+- decrypts with `utilitz.crypto.Decryptor`
+- restores only with `Decryptor.to_directory(...)`
+
+Local restore from an already downloaded `.asc` file remains available:
+
+```python
+from gitstore import restore_from_file
+
+restored_path = restore_from_file(
+    encrypted_file_path="C:/downloads/my_backup_2026_05.asc",
+    password=None,
+    local_dir="C:/restore/my_backup_2026_05",
+    overwrite=False,
+)
+print(restored_path)
+```
 
 ## Valid Names
 
-`name` is the logical identifier used to upload an artifact.
-It is intentionally strict to keep Git paths predictable:
+`name` is the artifact identifier. It is intentionally strict to keep Git paths predictable:
 
 - allowed characters: letters, numbers, dots, underscores, and hyphens
 - must start with a letter or number
@@ -84,60 +133,44 @@ maindb-version-0.1
 backup.2026_05
 ```
 
-Invalid examples:
+## JSON Formats
 
-```text
-maindb -version 0.1
-../secret
-folder/documento
+Remote `vault/index.json`:
+
+```json
+[
+  {
+    "artifact_name": "my_backup_2026_05",
+    "artifact_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "timestamp": "2026-05-08T21:10:00Z"
+  }
+]
 ```
 
-## Download
+Local `~/.gitstore.json`:
 
-```python
-from gitstore import restore_from_github
-
-output_path = restore_from_github(
-    github_raw_url="https://raw.githubusercontent.com/USER/REPO/main/vault/documento_ventas_q2.asc",
-    password=None,      # default: uses GITSTORE_PASSWORD
-    output_path=None,   # default: restores in a system temp folder (outside the repo)
-    overwrite=False,    # default
-    force=False,        # default
-    use_urllib=False,   # default: True uses urllib alternative route
-)
-print(output_path)
+```json
+{
+  "uploads": [
+    {
+      "repo_dir": "C:/repos/my-vault-repo",
+      "vault_subdir": "vault",
+      "local_dir": "C:/data/my_directory",
+      "artifact_name": "my_backup_2026_05",
+      "content_hash": "d57e5433434d3d2c1234...",
+      "timestamp": "2026-05-08T21:10:00Z"
+    }
+  ],
+  "downloads": [
+    {
+      "local_dir": "C:/restore/my_backup_2026_05",
+      "source_url": "https://raw.githubusercontent.com/USER/REPO/main/vault/my_backup_2026_05.asc",
+      "artifact_hash": "e3b0c44298fc1c149afb...",
+      "timestamp": "2026-05-08T21:15:00Z"
+    }
+  ]
+}
 ```
-
-Local restore (no network):
-
-```python
-from gitstore import restore_from_file
-
-output_path = restore_from_file(
-    encrypted_file_path="C:/downloads/documento_ventas_q2.asc",
-    password=None,      # default: uses GITSTORE_PASSWORD
-    output_path=None,   # optional
-    overwrite=False,    # default
-)
-print(output_path)
-```
-
-Tip:
-
-- use `restore_from_file(...)` when the target machine has SSL/certificate restrictions and you prefer manual transfer of the `.asc` file.
-
-Download behavior:
-
-- expects RAW GitHub URLs (`raw.githubusercontent.com/...`) as primary input
-- also accepts `github.com/.../blob/...` and normalizes automatically
-- skips download when `output_path` already exists and matches the remote `source_hash` in `vault/index.json`
-- set `force=True` to download even when the local output appears aligned
-- set `use_urllib=True` to use the urllib alternative transport path
-- downloads the encrypted `.asc` file to a temporary location
-- when `output_path=None`, restore output is created in a system temp folder (not in project root)
-- restores files or directories automatically with `utilitz.crypto`
-- removes the temporary encrypted file after restore
-- supports local decode with `restore_from_file(...)` when manual download is preferred
 
 ## Password Source
 

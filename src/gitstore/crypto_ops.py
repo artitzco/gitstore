@@ -1,6 +1,28 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import timezone
 from pathlib import Path
+from typing import Any
 
 from .config import GitStoreConfig
+
+PathInput = str | Path
+
+
+@dataclass(frozen=True)
+class EncryptionResult:
+    encrypted_text: str
+    artifact_hash: str
+    content_hash: str
+    timestamp: str
+
+
+@dataclass(frozen=True)
+class PreparedDirectory:
+    path: Path
+    crypto_input: Any
+    content_hash: str
 
 
 def _crypto():
@@ -13,105 +35,90 @@ def _crypto():
     return utilitz_crypto
 
 
-def _resolve_security(security_level: str):
-    crypto = _crypto()
-    level = (security_level or "standard").strip().lower()
-    if level == "standard":
-        return crypto.SECURITY_STANDARD
-    if level == "high":
-        return crypto.SECURITY_HIGH
-    if level == "paranoid":
-        return crypto.SECURITY_PARANOID
-    raise ValueError("security_level must be 'standard', 'high', or 'paranoid'.")
-
-
-def encrypt_file(
-    source_path: str,
-    config: GitStoreConfig,
-    output_path: str | None = None,
-    security_level: str = "high",
-) -> str:
-    path = Path(source_path).expanduser().resolve()
-    if not path.is_file():
-        raise FileNotFoundError(f"Input file not found: {path}")
-    return _crypto().encrypt_file(
-        file_path=str(path),
-        password=config.password,
-        output_path=output_path,
-        security=_resolve_security(security_level),
-    )
+def _timestamp(value: Any) -> str:
+    if hasattr(value, "astimezone"):
+        return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return str(value)
 
 
 def encrypt_directory(
-    source_directory: str,
+    local_dir: PathInput,
     config: GitStoreConfig,
-    output_path: str | None = None,
-    security_level: str = "high",
-) -> str:
-    path = Path(source_directory).expanduser().resolve()
-    if not path.is_dir():
-        raise FileNotFoundError(f"Input directory not found: {path}")
-    return _crypto().encrypt_directory(
-        directory_path=str(path),
-        password=config.password,
-        output_path=output_path,
-        security=_resolve_security(security_level),
+    *,
+    include_patterns: str | list[str] | tuple[str, ...] | None = None,
+    exclude_patterns: str | list[str] | tuple[str, ...] | None = None,
+    encryption_params: dict[str, Any] | None = None,
+) -> EncryptionResult:
+    prepared = prepare_directory_input(
+        local_dir,
+        include_patterns=include_patterns,
+        exclude_patterns=exclude_patterns,
+    )
+    return encrypt_prepared_directory(
+        prepared,
+        config,
+        encryption_params=encryption_params,
     )
 
 
-def decrypt_file(
-    encrypted_path: str,
+def prepare_directory_input(
+    local_dir: PathInput,
+    *,
+    include_patterns: str | list[str] | tuple[str, ...] | None = None,
+    exclude_patterns: str | list[str] | tuple[str, ...] | None = None,
+) -> PreparedDirectory:
+    path = Path(local_dir).expanduser().resolve()
+    if not path.is_dir():
+        raise FileNotFoundError(f"Input directory not found: {path}")
+
+    crypto = _crypto()
+    crypto_input = crypto.CryptoInput.from_directory(
+        str(path),
+        include_patterns=include_patterns,
+        exclude_patterns=exclude_patterns,
+    )
+    return PreparedDirectory(
+        path=path,
+        crypto_input=crypto_input,
+        content_hash=crypto_input.content_hash,
+    )
+
+
+def encrypt_prepared_directory(
+    prepared: PreparedDirectory,
     config: GitStoreConfig,
-    output_path: str | None = None,
-    overwrite: bool = False,
-) -> str:
-    path = Path(encrypted_path).expanduser().resolve()
-    if not path.is_file():
-        raise FileNotFoundError(f"Encrypted file not found: {path}")
-    return _crypto().decrypt_file(
-        encrypted_file=str(path),
-        password=config.password,
-        output_path=output_path,
-        overwrite=overwrite,
+    *,
+    encryption_params: dict[str, Any] | None = None,
+) -> EncryptionResult:
+    crypto = _crypto()
+    encryptor = crypto.Encryptor(prepared.crypto_input).encrypt(
+        config.password,
+        **(encryption_params or {}),
+    )
+    output = encryptor.output
+    if output is None:
+        raise ValueError("Encryption did not produce an output.")
+
+    return EncryptionResult(
+        encrypted_text=output.to_string(encoding="utf-8"),
+        artifact_hash=output.content_hash,
+        content_hash=prepared.content_hash,
+        timestamp=_timestamp(output.created_at),
     )
 
 
 def decrypt_directory(
-    encrypted_path: str,
+    encrypted_text: str,
     config: GitStoreConfig,
-    output_path: str | None = None,
+    local_dir: PathInput | None = None,
+    *,
     overwrite: bool = False,
 ) -> str:
-    path = Path(encrypted_path).expanduser().resolve()
-    if not path.is_file():
-        raise FileNotFoundError(f"Encrypted file not found: {path}")
-    return _crypto().decrypt_directory(
-        encrypted_file=str(path),
-        password=config.password,
-        output_path=output_path,
-        overwrite=overwrite,
-    )
-
-
-def decrypt_auto(
-    encrypted_path: str,
-    config: GitStoreConfig,
-    output_path: str | None = None,
-    overwrite: bool = False,
-) -> str:
-    try:
-        return decrypt_file(
-            encrypted_path=encrypted_path,
-            config=config,
-            output_path=output_path,
-            overwrite=overwrite,
-        )
-    except ValueError as exc:
-        if "directory archive" not in str(exc):
-            raise
-    return decrypt_directory(
-        encrypted_path=encrypted_path,
-        config=config,
-        output_path=output_path,
+    decryptor = _crypto().Decryptor.from_string(encrypted_text, encoding="utf-8")
+    decryptor.decrypt(config.password)
+    return decryptor.to_directory(
+        local_dir,
+        exact_path=True,
+        create_parent=True,
         overwrite=overwrite,
     )

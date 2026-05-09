@@ -5,33 +5,48 @@ from gitstore import upload_to_github
 
 def main() -> None:
     """
-    Upload example with explicit defaults.
+    Directory upload example with explicit defaults.
 
-    upload_to_github defaults:
-    - password=None (uses GITSTORE_PASSWORD)
-    - vault_dir="vault"
+    upload_to_github parameters:
+    - local_dir: directory to package, hash, and encrypt; str or pathlib.Path
+    - name: artifact name; saved as <name>.asc
+    - repo_dir: local git repository that receives the vault files; str or pathlib.Path
+    - password=EXAMPLE_PASSWORD
+    - vault_subdir="vault"
     - request_timeout=60
     - password_env_var="GITSTORE_PASSWORD"
-    - security_level="high"
-    - commit_message=None (auto message)
+    - commit_message=None: uses an automatic message
     - replace_existing=True
-    - force=False
+    - force=False: skips only when local content_hash is unchanged
+    - include_patterns=None
+    - exclude_patterns=None
+    - gitstore_path=None: uses ~/.gitstore.json
+    - salt_size=16
+    - iterations=100_000
+    - key_length=32
+    - hash_name="sha256"
     """
     project_root = Path(__file__).resolve().parents[1]
-    sample_folder = project_root / "examples" / "data" / "sample_data"
+    local_dir = project_root / "examples" / "sample_data"
 
     record = upload_to_github(
-        source_path=str(sample_folder),
+        local_dir=local_dir,
         name="sample_data_demo",
-        repo_path=str(project_root),
-        password=None,
-        vault_dir="vault",
+        repo_dir=project_root,
+        password="gitstore-example-9dK4vQp2Lm7xR8sN",
+        vault_subdir="vault",
         request_timeout=60,
         password_env_var="GITSTORE_PASSWORD",
-        security_level="high",
         commit_message=None,
         replace_existing=True,
         force=False,
+        include_patterns=None,
+        exclude_patterns=None,
+        gitstore_path=None,
+        salt_size=16,
+        iterations=100_000,
+        key_length=32,
+        hash_name="sha256",
     )
     print(record)
 

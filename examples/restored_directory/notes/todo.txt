@@ -1,0 +1,3 @@
+- Review the generated vault/sample_data_demo.asc artifact.
+- Confirm vault/index.json contains only public artifact metadata.
+- Restore the artifact into examples/restored_directory.

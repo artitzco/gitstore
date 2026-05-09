@@ -5,29 +5,30 @@ from gitstore import restore_from_github
 
 def main() -> None:
     """
-    Restore example with explicit defaults.
+    Remote directory restore example with explicit defaults.
 
-    restore_from_github defaults:
-    - password=None (uses GITSTORE_PASSWORD)
-    - output_path=None
+    restore_from_github parameters:
+    - github_raw_url: raw URL or github.com/.../blob/... URL
+    - password=EXAMPLE_PASSWORD
+    - local_dir=None: creates a temporary restore directory; str or pathlib.Path
     - overwrite=False
-    - force=False
-    - use_urllib=False
+    - force=False: skips only when local download state matches remote artifact_hash
     - request_timeout=60
     - password_env_var="GITSTORE_PASSWORD"
+    - gitstore_path=None: uses ~/.gitstore.json
     """
     project_root = Path(__file__).resolve().parents[1]
-    output_folder = project_root / "examples" / "data" / "restored_sample_data"
+    local_dir = project_root / "examples" / "restored_directory"
 
     restored_path = restore_from_github(
         github_raw_url="https://raw.githubusercontent.com/artitzco/gitstore/main/vault/sample_data_demo.asc",
-        password=None,
-        output_path=str(output_folder),
+        password="gitstore-example-9dK4vQp2Lm7xR8sN",
+        local_dir=local_dir,
         overwrite=False,
         force=False,
-        use_urllib=False,
         request_timeout=60,
         password_env_var="GITSTORE_PASSWORD",
+        gitstore_path=None,
     )
     print(restored_path)
 

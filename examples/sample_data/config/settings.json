@@ -1,0 +1,8 @@
+{
+  "project": "sample_data_demo",
+  "environment": "example",
+  "features": {
+    "directory_packaging": true,
+    "local_state": true
+  }
+}

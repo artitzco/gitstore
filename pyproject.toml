@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gitstore"
-version = "0.2.3"
-description = "Utilities to encrypt files/directories with utilitz and exchange them through GitHub repositories."
+version = "1.0.0"
+description = "Utilities to encrypt directories with utilitz and exchange them through GitHub repositories."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -13,8 +13,7 @@ authors = [
   { name = "artitzco" }
 ]
 dependencies = [
-  "requests>=2.31.0",
-  "utilitz[crypto]"
+  "utilitz[crypto]>=0.9.1"
 ]
 
 [tool.setuptools]
