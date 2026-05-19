@@ -8,5 +8,10 @@
     "artifact_name": "maindb_source",
     "artifact_hash": "9f02bef804687b96a52281db9fa311a8fd230ada8de958d31d66d3756e48e202",
     "timestamp": "2026-05-18T16:25:46.937463Z"
+  },
+  {
+    "artifact_name": "procentr",
+    "artifact_hash": "d6148e2df29d9a0b9a887f7e2b4a4dd3de71c98f22f9aeb1cc1744e801244f95",
+    "timestamp": "2026-05-19T17:38:29.698006Z"
   }
 ]
